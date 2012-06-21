@@ -1,0 +1,63 @@
+$Id: CHANGELOG.txt,v 1.1.2.36 2010/01/19 05:42:46 damienmckenna Exp $
+
+Open AdStream Changelog
+***********************
+v6.x-3.3:
+  * #651448: Way to limit the paths that the gutter ads display on.
+  * Moved the gutter settings to their own settings page.
+  * Moved the settings pages to the admin/build section.
+  * Minor performance boost - statically cache the page's path.
+  * Additional user permission to help divide duties.
+  * Display the module name in the positions list.
+  * Display the module name in the pagenames list.
+  * #652270: Added description field to position names.
+  * Fixed a problem with the gutter taking up the full screen when the DOM
+    object doesn't exist.
+  * Separated the gutter ad output in preparation for theming it.
+  * Allow for multiple gutter ad settings.
+  * Allow the gutter ads to be limited to a date range.
+  * #655886: Background color selector when adding gutter ads.
+  * Display the position description in the CTools content type item tooltip.
+  * Installs some default gutter ad settings when the module is enabled.
+  * Update script to ensure the default gutter ad settings are installed.
+  * Changed to using db_fetch_array instead of db_fetch_object due to memory
+    leaks in PHP < v5.3.
+  * Changed to using drupal_set_html_head() to send the header JS code.
+  * Changed to using a function & static variable to storing the list of ad
+    positions instead of a global variable.
+  * Renamed the main settings menu item to just "Open AdStream".
+  * Rewrite of the main module documentation file, README.txt.
+  * Re-ordered the sub-tasks to fit the order of items described in the docs.
+  * No longer requires Nodewords module to correctly output the header JS
+    code, i.e. finally resolved the confusion between hook_process(),
+    drupal_set_html_head() and drupal_get_html_head().
+  * Incorrect usage of user_access() to control the per-node settings.
+  * Added some descriptions to the node form fields.
+  * Bug caused all node pages to fail if they had a custom pagename.
+  * #680270: Allow the pagename to be overridden by a URL variable.
+  * Fixed a bug in the querystring-pagename feature.
+  * #684810: Only output the header code if there are ads to show.
+v6.x-3.2:
+  * #650884: Gutter ads.
+  * #650980: Automatic pagenames not working for nodes.
+  * #650964: Hook to allow the pagename to be overridden,
+    hook_openadstream_override_pagename().
+v6.x-3.1:
+  * #650876: Provide option to control whether base_path added to pagename.
+  * #650882: Provide option to change ads hostname.
+  * #650890: Output DIVs need to use same class names.
+  * #650902: Add permission for controlling whether node pagename field is
+    available.
+v6.x-3.0:
+  * First release on d.o.  Project renamed to "openadstream".
+v6.x-2.x:
+  * Near complete rewrite by LewisVance. Changed back to outputting standard
+    DIVs for ad placement instead of problematic iframes.  CTools integration
+    provided by datacaliber.
+v6.x-1.x:
+  * Migration of D5 module to D6 for scubadiving.com.
+v5.x-2.x:
+  * Converted to using iFrames for all ad position output.
+v5.x-1.x:
+  * Originally written by DamienMcKenna for skinet.com and named
+    "ad247realmedia".

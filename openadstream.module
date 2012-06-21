@@ -1,0 +1,949 @@
+<?php
+// $Id: openadstream.module,v 1.1.2.33 2010/01/15 00:45:59 damienmckenna Exp $
+/**
+ * @file
+ * Open AdStream Integration.
+ */
+
+/**
+ * Implementation of hook_theme().
+ */
+function openadstream_theme() {
+  return array(
+    'openadstream_preprocess_page' => array(
+      'arguments' => array('vars' => NULL),
+    ),
+  );
+}
+
+/**
+ * Implementation of hook_preprocess_page().
+ */
+function openadstream_preprocess_page(&$variables) {
+  // Assign the hostname, use the server_name variable if it's blank.
+  $hostname = variable_get('openadstream_hostname', '');
+  if ($hostname == '') {
+    $hostname = $_SERVER['SERVER_NAME'];
+  }
+
+  // See if the querystring should be checked.
+  $querystring_var = variable_get('openadstream_querystring', '');
+  $pagename = '';
+  // Check if the querystring variable exists.
+  if (!empty($query_string_var) && array_key_exists($_GET, $querystring_var)) {
+    $pagename = $_GET[$querystring_var];
+  }
+  
+  // If nothing found yet, continue as normal.
+  if (empty($pagename)) {
+    // Check first for page name.
+    $pagename = variable_get('openadstream_pagename', '');
+    // Use the path_alias if possible.
+    if ($pagename == '') {
+      $path = $_GET['q'];
+      if ($alias = drupal_get_path_alias($_GET['q'])) {
+        $path = $alias; 
+      }
+      $pagename = $path;
+    }
+
+    // Replace the pagename if we match any of the pagename rules.
+    $new_pagename = _openadstream_match_pagename();
+    if (!empty($new_pagename)) {
+      $pagename = $new_pagename;
+      unset($new_pagename);
+    }
+  }
+
+  // Work out if the base_path() should be included.
+  if (variable_get('openadstream_show_basepath', FALSE)) {
+    $pagename = base_path() . $pagename;
+  }
+
+  // Remove any trailing slashes from the pagename.
+  if (substr($pagename, -1) == '/') {
+    $pagename = substr($pagename, 0, -1);
+  }
+  // Remove any leading slashes from the pagename.
+  if (substr($pagename, 0, 1) == '/') {
+    $pagename = substr($pagename, 1);
+  }
+
+  // Load the gutter advertisements if they are wanted.
+  if (variable_get('openadstream_gutter_enabled', FALSE)) {
+    $variables['closure'] .= _openadstream_gutters();
+  }
+
+  // Grab an array of all of the current tags.
+  $tags = openadstream_gather_tags();
+
+  // Only proceed if ads were found
+  if (count(openadstream_positions())) {
+    // Compile the final header output.
+    $oas = _openadstream_js($hostname, $pagename, openadstream_positions(), $tags);
+
+    // Add the compiled headers.
+    drupal_set_html_head($oas);
+  
+    // Compile the HTML head values.
+    $variables['head'] = drupal_get_html_head();
+  }
+}
+
+function openadstream_gather_tags() {
+  $tags = array();
+  $hook = 'openadstream_tags';
+  foreach (module_implements($hook) as $name) {
+    $func = $name . '_' . $hook;
+    $ret = $func();
+    if (is_array($ret)) {
+      $tags = array_merge($tags, $ret);
+    }
+  }
+
+  $tags = array_unique($tags);
+  $output = implode(',', $tags); 
+  return $output;
+}
+
+function openadstream_openadstream_tags() {
+  if (arg(0) == 'node' && is_numeric(arg(1)) && $node = node_load(arg(1))) {
+    $ret = db_fetch_array(db_query('SELECT * FROM {openadstream_tags} WHERE vid = %d', $node->vid));
+    if ($ret && $ret['tags']) {
+      return explode(',', $ret['tags']);
+    }
+  }
+}
+
+/**
+ * Provide a central storage point for the page's positions.
+ *
+ * @param $position
+ *   Array of position names.
+ * @return
+ *   All of the positions currently in this page's stack.
+ */
+function openadstream_positions($position = NULL) {
+  static $positions = array();
+  
+  // If a position name was submitted, add it to the stack.
+  if (!empty($position)) {
+    $positions[] = $position;
+  }
+  
+  return $positions;
+}
+
+/**
+ * Implementation of hook_perm().
+ */
+function openadstream_perm() {
+  return array('administer openadstream configuration', 'configure openadstream node pagenames', 'configure openadstream gutter ads', 'configure openadstream pagenames');
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function openadstream_menu() {
+  $items = array();
+  
+  $items['admin/build/openadstream'] = array(
+    'title' => 'Open AdStream',
+    'description' => 'Configure the Open AdStream master code and advertisement blocks',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('openadstream_admin_settings'),
+    'access arguments' => array('administer openadstream configuration'),
+    'file' => 'openadstream.admin.inc',
+    'type' => MENU_NORMAL_ITEM,
+  );
+  
+  $items['admin/build/openadstream/general'] = array(
+    'title' => 'Main Settings',
+    'description' => 'Configure the Open AdStream master code and advertisement blocks',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('openadstream_admin_settings'),
+    'access arguments' => array('administer openadstream configuration'),
+    'file' => 'openadstream.admin.inc',
+    'weight' => -10,
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+  );
+
+  $items['admin/build/openadstream/gutters'] = array(
+    'title' => 'Gutter Ads',
+    'description' => 'Optional ads that fits within the page gutter',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('openadstream_admin_gutters'),
+    'access callback' => 'openadstream_access_gutters',
+    'file' => 'openadstream.admin.inc',
+    'weight' => -2,
+    'type' => MENU_LOCAL_TASK,
+  );
+  
+  $items['admin/build/openadstream/gutters-add'] = array(
+    'title' => 'Add Gutter Ad',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('openadstream_admin_gutters_add'),
+    'access callback' => 'openadstream_access_gutters',
+    'file' => 'openadstream.admin.inc',
+    'type' => MENU_LOCAL_TASK,
+    'weight' => -1,
+  );
+
+  $items['admin/build/openadstream/gutters-edit'] = array(
+    'title' => 'Edit Gutter Ad',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('openadstream_admin_gutters_edit'),
+    'access callback' => 'openadstream_access_gutters',
+    'file' => 'openadstream.admin.inc',
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['admin/build/openadstream/gutters-delete'] = array(
+    'title' => 'Delete Gutter Ad',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('openadstream_admin_gutters_delete'),
+    'access callback' => 'openadstream_access_gutters',
+    'file' => 'openadstream.admin.inc',
+    'type' => MENU_CALLBACK,
+  );
+  
+  $items['admin/build/openadstream/positions'] = array(
+    'title' => 'Positions',
+    'page callback' => 'openadstream_admin_positions',
+    'access arguments' => array('administer openadstream configuration'),
+    'file' => 'openadstream.admin.inc',
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 1,
+  );
+  
+  $items['admin/build/openadstream/positions-add'] = array(
+    'title' => 'Add Position',
+    'description' => 'Create a new Open AdStream position',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('openadstream_admin_positions_add'),
+    'access callback' => 'openadstream_access_positions',
+    'access arguments' => array('administer openadstream configuration'),
+    'file' => 'openadstream.admin.inc',
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 2,
+  );
+  
+  $items['admin/build/openadstream/positions-delete'] = array(
+    'title' => 'Delete Position',
+    'description' => 'Delete a Open AdStream position',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('openadstream_admin_positions_delete'),
+    'access callback' => 'openadstream_access_positions',
+    'access arguments' => array('administer openadstream configuration'),
+    'file' => 'openadstream.admin.inc',
+    'type' => MENU_CALLBACK,
+  );
+  
+  $items['admin/build/openadstream/pagenames'] = array(
+    'title' => 'Pagenames',
+    'page callback' => 'openadstream_admin_pagenames',
+    'access callback' => 'openadstream_access_positions',
+    'file' => 'openadstream.admin.inc',
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 5,
+  );
+  
+  $items['admin/build/openadstream/pagenames-add'] = array(
+    'title' => 'Add Pagename',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('openadstream_admin_pagenames_add'),
+    'access callback' => 'openadstream_access_positions',
+    'file' => 'openadstream.admin.inc',
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 6,
+  );
+  
+  $items['admin/build/openadstream/pagenames-edit'] = array(
+    'title' => 'Edit Pagename',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('openadstream_admin_pagenames_edit'),
+    'access callback' => 'openadstream_access_positions',
+    'file' => 'openadstream.admin.inc',
+    'type' => MENU_CALLBACK,
+  );
+  
+  $items['admin/build/openadstream/pagenames-delete'] = array(
+    'title' => 'Delete Pagename',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('openadstream_admin_pagenames_delete'),
+    'access callback' => 'openadstream_access_positions',
+    'file' => 'openadstream.admin.inc',
+    'type' => MENU_CALLBACK,
+  );
+  
+  return $items;
+}
+
+/**
+ * Control user access on the gutters menu item.
+ */
+function openadstream_access_gutters() {
+  return user_access('administer openadstream configuration') || user_access('configure openadstream gutter ads');
+}
+
+/**
+ * Control user access on the positions menu items.
+ */
+function openadstream_access_positions() {
+  return user_access('administer openadstream configuration') || user_access('configure openadstream pagenames');
+}
+
+/**
+ * Implementation of hook_block().
+ */
+function openadstream_block($op = 'list', $delta = 0, $edit = array()) {
+  if ($op == 'list') {
+    $blocks = array();
+    foreach (_openadstream_positions() as $position) {
+      $blocks[$position['name']] = array('info' => 'Open AdStream Ad: '. $position['name']);
+    }
+    return $blocks;
+  }
+  else if ($op == 'view') {
+    $block = array(
+      'subject' => '',
+      'content' => _openadstream_block_js($delta),
+    );
+    return $block;
+  }
+}
+
+/**
+ * Implementation of hook_ctools_plugin_directory().
+ */
+function openadstream_ctools_plugin_directory($module, $plugin) {
+  if ($module == 'ctools') {
+    return 'plugins/' . $plugin;
+  }
+}
+
+/**
+ * Implementation of hook_form_alter().
+ */
+function openadstream_form_alter(&$form, $form_state, $form_id) {
+  if (isset($form['type']) && isset($form['#node'])) {
+    if ($form['type']['#value'] . '_node_form' == $form_id) {
+            
+      // Only show the pagename node settings if the user has permission.
+      if (user_access('administer openadstream configuration') || user_access('configure openadstream node pagenames')) {
+        
+        if (isset($form['#node']->nid)) {
+          
+          $pagename = _openadstream_node_pagename($form['#node']->nid);
+          if ($pagename !== FALSE) {
+            $default_value = $pagename;
+          }
+          $node = $form['#node'];
+          $items = db_fetch_array(db_query('SELECT * FROM {openadstream_tags} WHERE vid = %d', $node->vid));
+          $tags = $items->tags;
+        }
+
+        $form['openadstream'] = array(
+          '#type' => 'fieldset',
+          '#title' => t('Open AdStream Settings'),
+          '#collapsible' => TRUE,
+          '#collapsed' => TRUE,
+        );
+        $form['openadstream']['openadstream_pagename'] = array(
+          '#type' => 'textfield',
+          '#title' => t('Pagename'),
+          '#default_value' => (isset($default_value)) ? $default_value : '',
+          '#size' => 20,
+          '#maxlength' => 75,
+          '#description' => t('Manually override the pagename value, not usually required.'),
+        );
+        $form['openadstream']['openadstream_tags'] = array(
+          '#type' => 'textfield',
+          '#title' => t('Tags'),
+          '#default_value' => (isset($tags)) ? $tags : '',
+          '#size' => 20,
+          '#maxlength' => 150,
+          '#description' => t('Manually override the tags value, not usually required.'),
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Implementation of hook_nodeapi().
+ */
+function openadstream_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
+  switch ($op) {
+    case 'insert':
+    case 'update':
+      // Only process the pagename node settings if the user has permission.
+      if (user_access('administer openadstream configuration') || user_access('configure openadstream node pagenames')) {
+        db_query("DELETE FROM {openadstream_node_pagenames} WHERE nid = %d", $node->nid);
+        if (!empty($node->openadstream_pagename)) {
+          $sql = "INSERT INTO {openadstream_node_pagenames} (nid, pagename) VALUES (%d, '%s')";
+          db_query($sql, $node->nid, $node->openadstream_pagename);
+        }
+
+        $obj = new stdClass;
+        $obj->vid = $node->vid;
+        $obj->nid = $node->nid;
+        $obj->tags = $node->openadstream_tags;
+        drupal_write_record('openadstream_tags', $obj, array('vid'));
+        if (!db_affected_rows()) {
+          drupal_write_record('openadstream_tags', $obj);
+        }
+      }
+      break;
+
+    case 'delete':
+      db_query("DELETE FROM {openadstream_node_pagenames} WHERE nid = %d", $node->nid);
+      db_query("DELETE FROM {openadstream_tags} WHERE nid = %d", $node->nid);
+      break;
+  }
+}
+
+/**
+ * Retrieve a list of positions defined in the admin gui
+ *
+ * @return
+ *   list of positions
+ */
+function _openadstream_admin_positions() {
+  $positions = array();
+  $results = db_query("SELECT position_id, name, description FROM {openadstream_positions} ORDER BY name ASC");
+  while ($position = db_fetch_array($results)) {
+    $positions[] = $position;
+  }
+  return $positions;
+}
+
+/**
+ * Retrieve a list of all positions
+ *
+ * @return 
+ *   list of all positions
+ */
+function _openadstream_positions() {
+  $cache = cache_get('openadstream_positions');
+  if ($cache) {
+    return $cache->data;
+  }
+  
+  $positions = _openadstream_admin_positions();
+  $default_positions = _openadstream_invoke_default_positions();
+  $positions = array_merge($positions, $default_positions);
+  cache_set('openadstream_positions', $positions);
+  
+  return $positions;
+}
+
+/**
+ * Return a list of all position names.
+ *
+ * @return
+ *  The names of all positions.
+ */
+function _openadstream_position_names() {
+  $positions = array();
+  foreach (_openadstream_positions() as $x => $pos) {
+    $positions[$pos['name']] = $pos['name'];
+  }
+  ksort($positions);
+  return $positions;
+}
+
+/**
+ * Clear all cached positions.
+ */
+function _openadstream_clear_positions_cache() {
+  cache_clear_all('openadstream_positions', 'cache');
+}
+
+/**
+ * Create the Open AdStream javascript that must be included in the head.
+ *
+ * @param $hostname
+ *   Provided by 24/7 RealMedia.
+ * @param $pagename
+ *   Provided by 24/7 RealMedia.
+ * @param $ad_positions
+ *   Array of position names.
+ * @return
+ *   Open AdStream javascript block to include in the header of the page.
+ */
+function _openadstream_js($hostname, $pagename, $ad_positions, $tags='') {
+  // The ads hostname.
+  $oas_url = variable_get('openadstream_oas_hostname', '');
+  // The base URL used to load ads.
+  $base_url = "http://{$oas_url}/RealMedia/ads/adstream_mjx.ads/";
+  // Remove leading & ending slashes from the $pagename.
+  if (substr($pagename, 0, 1) == '/') {
+    $substr($pagename, 1);
+  }
+  if (substr($pagename, -1, 1) == '/') {
+    $substr($pagename, 0, -1);
+  }
+  
+  // Build the full URL to load the page JS.
+  $src = $base_url . $hostname . "/' + p + '/" . rand() .'@'. implode(',', $ad_positions) . '?' . $tags;
+  $js = "<script type=\"text/javascript\">\n";
+  $js .= "<!--//--><![CDATA[//><!--\n";
+  // The pagename found thus far.
+  $js .= "var p='{$pagename}';\n";
+  
+  // Optional code for checking the URL string.
+  if ($qs = variable_get('openadstream_querystring', '')) {
+    // JS function to grab URL variables.
+    $js .= "function urlParam(name) {\n";
+    $js .= "  name = name.replace(/[\[]/,\"\\\[\").replace(/[\]]/,\"\\\]\");\n";
+    $js .= "  var regexS = \"[\\?&]\"+name+\"=([^&#]*)\";\n";
+    $js .= "  var regex = new RegExp(regexS);\n";
+    $js .= "  var results = regex.exec(window.location.href);\n";
+    $js .= "  if (results == null) {\n";
+    $js .= "    return \"\";\n";
+    $js .= "  }\n";
+    $js .= "  else {\n";
+    $js .= "    return results[1];\n";
+    $js .= "  };\n";
+    $js .= "};\n";
+    // Check if the pagename is being overridden by the querystring.
+    $js .= "var q='{$qs}';\n";
+    $js .= "if (urlParam(q) != '') {\n";
+    $js .= "  p = urlParam(q);\n";
+    $js .= "};\n";
+  }
+
+  // Output the JS load code.
+  $js .= "document.write('<' + 'script type=\"text/javascript\" src=\"{$src}\"><' + '/script>');\n";
+
+  // Close the JS.
+  $js .= "//--><!]]>\n";
+  $js .= "</script>\n";
+
+  return $js;
+}
+
+/**
+ * Create the Open AdStream javascript to display an advertisement.
+ */
+function _openadstream_block_js($position) {
+  openadstream_positions($position);
+  $position_lower = strtolower($position);
+  $js = <<<JS
+    <div class="oas-ad oas-{$position_lower}"><script type="text/javascript">
+    <!--//--><![CDATA[//><!--
+    OAS_RICH('{$position}');
+    //--><!]]>
+    </script></div>
+JS;
+  return $js;
+}
+
+/**
+ * Retrieve the pagename pagename for the specified node id.
+ *
+ * @return
+ *   Pagename or FALSE if no pagename exists
+ */
+function _openadstream_node_pagename($nid) {
+  return db_result(db_query("SELECT pagename FROM {openadstream_node_pagenames} WHERE nid = %d", $nid));
+}
+
+/**
+ * Retrieve all pagename pagenames set in the admin interface
+ */
+function _openadstream_admin_pagenames() {
+  $results = db_query("SELECT * FROM {openadstream_pagenames} ORDER BY weight ASC, pagename_id ASC");
+  $pagenames = array();
+  while ($pagename = db_fetch_array($results)) {
+    $pagenames[] = $pagename;
+  }
+  
+  return $pagenames;
+}
+
+/**
+ * Invoke a hook_openadstream_default_pagenames() operation in all modules
+ *
+ * @return
+ *   the returned value of the invoked hooks
+ */
+function _openadstream_invoke_default_pagenames() {
+  $return = array();
+  
+  // Loop over each of the module implementations.
+  foreach (module_implements('openadstream_default_pagenames') as $name) {
+    // Call the module.
+    $result = call_user_func($name . '_openadstream_default_pagenames');
+    // If there was a valid result, process it.
+    if (isset($result) && is_array($result)) {
+      // Track the module that added it.
+      foreach ($result as $x => $pagename) {
+        $result[$x]['module'] = $name;
+      }
+      // Add it to the stack.
+      $return = array_merge($return, $result);
+    }
+  }
+  
+  // Sort pagenames by weight.
+  usort($return, '_openadstream_cmp_pagenames');
+
+  return $return;
+}
+
+/**
+ * Sorting function for ordering pagename pagenames.
+ */
+function _openadstream_cmp_pagenames($a, $b) {
+  $a_weight = $a['weight'];
+  $b_weight = $b['weight'];
+  
+  if ($a_weight == $b_weight) {
+    return 0;
+  }
+  return ($a_weight < $b_weight) ? -1 : 1;
+}
+
+/**
+ * Invoke hook_openadstream_default_positions. Retrieves all ad positions
+ * defined by modules.
+ *
+ * @return
+ *   List of positions.
+ */ 
+function _openadstream_invoke_default_positions() {
+  $return = array();
+  
+  // Loop over each of the module implementations.
+  foreach (module_implements('openadstream_default_positions') as $name) {
+    // Call the module.
+    $result = call_user_func($name .'_openadstream_default_positions');
+    // If there was a valid result, process it.
+    if (isset($result) && is_array($result)) {
+      // Add the module name to the entries.
+      foreach ($result as $x => $position) {
+        // Track the module that added it.
+        $result[$x]['module'] = $name;
+        // If no position was presented, set a default.
+        if (!isset($position['description'])) {
+          $result[$x]['description'] = '';
+        }
+      }
+      // Add it to the stack.
+      $return = array_merge($return, $result);
+    }
+  }
+  
+  return $return;
+}
+
+/**
+ * Retrieve all pagename pagenames.
+ *
+ * @return
+ *   list of all pagename pagenames
+ */
+function _openadstream_pagenames() {
+  $cache = cache_get('openadstream_pagenames');
+  if ($cache) {
+    return $cache->data;
+  }
+  
+  $admin_pagenames = _openadstream_admin_pagenames();
+  $module_pagenames = _openadstream_invoke_default_pagenames();
+  
+  // Admin pagenames are first so they will win over module pagenames
+  $pagenames = array_merge($admin_pagenames, $module_pagenames);
+  cache_set('openadstream_pagenames', $pagenames);
+  
+  return $pagenames;
+}
+
+/**
+ * Clear the cached pagename pagenames
+ */
+function _openadstream_clear_pagenames_cache() {
+  cache_clear_all('openadstream_pagenames', 'cache');
+}
+
+/**
+ * Retrieve pagename pagename rules defined in settings form and by modules
+ * then attempt to match rules to the current path.
+ *
+ * @return
+ *   new pagename if one or more rules matched, FALSE if no rules matched
+ */
+function _openadstream_match_pagename() {
+  $pagename = FALSE;
+
+  // A node's manually-assigned pagename always takes priority.
+  if (arg(0) == 'node' && is_numeric(arg(1))) {
+    $pagename = _openadstream_node_pagename(arg(1));
+  }
+  // If nothing yet, try matching the URL.
+  if ($pagename == FALSE) {
+    foreach (_openadstream_pagenames() as $page) {
+      if (_openadstream_match_path($page['path'])) {
+        $pagename = $page['pagename'];
+        break;
+      }
+    }
+  }
+
+  // hook_openadstream_override_pagename()
+  // Check to see if other modules want to try overriding the pagename. See
+  // API.txt for full details.
+  foreach (module_implements('openadstream_override_pagename') as $module) {
+    // Execute the function.
+    $function_name = $module . '_openadstream_override_pagename';
+    $new_pagename = $function_name($pagename);
+    // If a pagename was set, use it.
+    if (!empty($new_pagename)) {
+      $pagename = $new_pagename;
+      // Break out of the loop the first time we find a new value.
+      break;
+    }
+  }
+
+  return $pagename;
+}
+
+/**
+ * Attempt to match the current path with the specific path rule
+ *
+ * @param $pagename_path
+ *   path rule using block visibility syntax
+ * @return
+ *   TRUE if path matches otherwise FALSE
+ */
+function _openadstream_match_path($pagename_path) {
+  static $path;
+  // Cache the path alias to improve performance.
+  if ($path === FALSE) {
+    $path = drupal_get_path_alias($_GET['q']);
+  }
+  // Compare with the internal and path alias (if any).
+  $page_match = drupal_match_path($path, $pagename_path);
+  if ($path != $_GET['q']) {
+    $page_match = $page_match || drupal_match_path($_GET['q'], $pagename_path);
+  }
+  return $page_match;
+}
+
+/**
+ * hook_panels_pre_render() - interact with panels before they are displayed.
+ */
+function openadstream_panels_pre_render(&$display) {
+  // Loop over the display objects.
+  foreach ($display->content as &$content) {
+    // Don't cache ads.
+    if ($content->type == 'ads' || strpos($content->subtype, 'openadstream') !== FALSE) {
+      $content->cache['method'] = NULL;
+    }
+  }
+}
+
+/**
+ * Compile the gutter code.
+ */
+function _openadstream_gutters() {
+  $output = '';
+
+  // Support for gutter ads.
+  $left = variable_get('openadstream_gutter_left', '');
+  $right = variable_get('openadstream_gutter_right', '');
+
+  // If a gutter is needed, deal with it.
+  if ($left || $right) {
+  
+    // The time right now, used for calculations later.
+    $now = time();
+    // Paths that should be included.
+    $include = trim(variable_get('openadstream_gutter_path_include', '*'));
+    // Paths that should be excluded.
+    $exclude = trim(variable_get('openadstream_gutter_path_exclude', "admin\nadmin/*\nnode/add\nnode/add/*\nnode/*/edit"));
+
+    // Decide if the gutters should be shown.
+    $show_gutters = FALSE;
+
+    // Grab the gutters data.
+    $includes = _openadstream_list_gutters('include');
+    $excludes = _openadstream_list_gutters('exclude');
+
+    // Check the Include statements, keep the bgcolor for later.
+    $bgcolor = $show_gutters = _openadstream_gutters_match($includes);
+
+    // Check the Exclude statements.
+    // Optimization: only bother if the Includes turned up TRUE.
+    if ($show_gutters) {
+      $show_gutters = !_openadstream_gutters_match($excludes);
+    }
+
+    // Only proceed if we're supposed to, pass along the bgcolor.
+    if ($show_gutters) {
+      $output = _openadstream_gutters_output($bgcolor);
+    }
+  }
+  
+  return $output;
+}
+
+/**
+ * Work out if the requested gutter settings match the current path.
+ */
+function _openadstream_gutters_match($gutters) {
+  $show_gutters = FALSE;
+  foreach ($gutters as $gutter) {
+    // If the From Date is empty or in the past, and if the To Date is empty
+    // or in the future, and if the path matches, it's a match.
+    if ((empty($gutter['date_from']) || $gutter['date_from'] <= $now) 
+      && (empty($gutter['date_to']) || $gutter['date_to'] >= $now) 
+      && _openadstream_match_path($gutter['path'])) {
+      // If there's a bgcolor, send that back
+      if (!empty($gutter['bgcolor'])) {
+        $show_gutters = $gutter['bgcolor'];
+      }
+      else {
+        $show_gutters = TRUE;
+      }
+      break;
+    }
+  }
+  return $show_gutters;
+}
+
+/**
+ * Compile the output for the gutter ads.
+ */
+function _openadstream_gutters_output($bgcolor = '') {
+  // Work out what DOM element to use to build the page width.
+  $dom = variable_get('openadstream_gutter_dom', '#page');
+  // Optional padding to put between the gutter and the page content.
+  $padding = (int) variable_get('openadstream_gutter_padding', 0);
+  
+  // The JS block gets appended to the other output at the end.
+  $output = '';
+  $js = '';
+
+  // Build up the JS that will be used.
+  $js .= "<script type=\"text/javascript\">\n";
+  // Make sure that the DOM object exists on the page by wrapping
+  // everything around it.
+  $js .= "$('{$dom}').ready(function() {\n";
+  // Store it as a variable, makes it easier to reuse.
+  $js .= "  var gutter_resize = function() {\n";
+  // Work out the width of the gutter.
+  $js .= "    var gutter_width = parseInt((document.body.clientWidth - $('{$dom}').width()) / 2) - {$padding};\n";
+  // Work out the height of the gutter.
+  $js .= "    var gutter_height = document.body.clientHeight;\n";
+  // If present, add the background-color.
+  if (!empty($bgcolor)) {
+    $js .= "    $('body').attr('style', 'background-color:{$bgcolor};');\n";
+  }
+
+  // Compile the left gutter.
+  if ($left) {
+    // Have to run through the block function to hit all the switches.
+    $block = openadstream_block('view', $left);
+    // Output the full block.
+    $output .= "<div id=\"oas-gutter-left\" style=\"position:absolute;top:0;left:0;overflow:hidden;\">" . $block['content'] . "</div>\n";
+    // Add the JS.
+    $js .= "    $('#oas-gutter-left').width(gutter_width).height(gutter_height);\n";
+  }
+  // Compile the right gutter.
+  if ($right) {
+    // Have to run through the block function to hit all the switches.
+    $block = openadstream_block('view', $right);
+    // Output the full block.
+    $output .= "<div id=\"oas-gutter-right\" style=\"position:absolute;top:0;right:0;overflow:hidden;\">" . $block['content'] . "</div>\n";
+    // Add the JS.
+    $js .= "    $('#oas-gutter-right').width(gutter_width).height(gutter_height);\n";
+  }
+
+  // Close the JS function.
+  $js .= "  };\n";
+
+  // Resize the gutter every time the window is resized.
+  $js .= "  $(window).resize(gutter_resize);\n";
+  // Resize the gutter immediately.
+  $js .= "  gutter_resize();\n";
+  
+  // Close off the initial DOM logic.
+  $js .= "});\n";
+
+  $js .= "</script>\n";
+
+  // Add the compiled JS to the output.
+  $output .= $js;
+  
+  return $output;
+}
+
+/**
+ * Get a list of gutter definitions for a particular type.
+ */
+function _openadstream_list_gutters($type) {
+  // Try loading the data from the cache.
+  $cache = cache_get('openadstream_gutters_' . $type);
+  // Found it!
+  if ($cache) {
+    // Send it back.
+    return $cache->data;
+  }
+
+  // Nothing found, so build the list.
+  $now = time();
+  $results = db_query("SELECT g.id, g.path, g.date_from, g.date_to, g.is_include FROM {openadstream_gutters} g WHERE g.date_from <= %d OR g.date_from = 0 ORDER BY g.is_include, g.date_from DESC, g.date_to DESC", $now);
+
+  // Compile the data.
+  $gutters = array('include' => array(), 'exclude' => array());
+  while ($gutter = db_fetch_array($results)) {
+    if ($gutter['is_include']) {
+      $gutters['include'][] = $gutter;
+    }
+    else {
+      $gutters['exclude'][] = $gutter;
+    }
+  }
+
+  // Save the data in the cache.
+  foreach ($gutters as $type => $data) {
+    cache_set('openadstream_gutters_' . $type, $data);
+  }
+  
+  return $gutters[$type];
+}
+
+/**
+ * Get a list of all gutter definitions.
+ */
+function _openadstream_list_gutters_all() {
+  // Nothing found, so build the list.
+  $now = time();
+  $results = db_query("SELECT g.id, g.path, g.date_from, g.date_to, g.is_include, g.bgcolor
+    FROM {openadstream_gutters} g
+    WHERE g.date_from <= %d OR g.date_from = 0
+    ORDER BY g.is_include, g.date_from DESC, g.date_to DESC", $now);
+
+  // Compile the data.
+  $gutters = array('include' => array(), 'exclude' => array());
+  while ($gutter = db_fetch_array($results)) {
+    if ($gutter['is_include']) {
+      $gutters['include'][$gutter['id']] = $gutter;
+    }
+    else {
+      $gutters['exclude'][$gutter['id']] = $gutter;
+    }
+  }
+
+  return $gutters;
+}
+
+/**
+ * Clear all cached gutter ads.
+ */
+function _openadstream_clear_gutters_cache() {
+  cache_clear_all('openadstream_gutters', 'cache');
+}

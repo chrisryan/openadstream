@@ -1,0 +1,271 @@
+<?php
+// $Id: openadstream.install,v 1.1.2.6 2009/12/17 04:31:46 damienmckenna Exp $
+/**
+ * @file
+ * Installation and update scripts for Open AdStream.
+ */
+
+/**
+ * Implementation of hook_schema().
+ */
+function openadstream_schema() {
+  $schema = array();
+
+  $schema['openadstream_tags'] = array(
+    'fields' => array(
+      'nid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'vid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'tags' => array(
+        'type' => 'varchar',
+        'length' => 100,
+        'default' => '',
+      ),
+    ),
+    'primary key' => array('vid'), 
+  );
+  
+  $schema['openadstream_positions'] = array(
+    'fields' => array(
+      'position_id' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'name' => array(
+        'type' => 'varchar',
+        'length' => 75,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'description' => array(
+        'type' => 'varchar',
+        'length' => 100,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+    ),
+    'primary key' => array('position_id'),
+    'indexes' => array('name' => array('name')),
+  );
+  
+  $schema['openadstream_node_pagenames'] = array(
+    'fields' => array(
+      'nid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'pagename' => array(
+        'type' => 'varchar',
+        'length' => 75,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+    ),
+    'primary key' => array('nid'),
+    'indexes' => array('pagename' => array('pagename')),
+  );
+  
+  $schema['openadstream_pagenames'] = array(
+    'fields' => array(
+      'pagename_id' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'path' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'pagename' => array(
+        'type' => 'varchar',
+        'length' => 75,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'weight' => array(
+        'type' => 'int',
+        'unsigned' => FALSE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'primary key' => array('pagename_id'),
+  );
+  
+  $schema['openadstream_gutters'] = array(
+    'fields' => array(
+      'id' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'path' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'date_from' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'date_to' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'is_include' => array(
+        'type' => 'int',
+        'size' => 'tiny',
+        'unsigned' => TRUE,
+        'default' => 1,
+      ),
+      'bgcolor' => array(
+        'type' => 'char',
+        'length' => 6,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+    ),
+    'primary key' => array('id'),
+    'indexes' => array(
+      'dates' => array('id', 'date_from', 'date_to', 'is_include'),
+    ),
+  );
+  
+  return $schema;
+}
+
+/**
+ * Implementation of hook_install().
+ */
+function openadstream_install() {
+  drupal_install_schema('openadstream');
+}
+
+/**
+ * Implementation of hook_enable().
+ */
+function openadstream_enable() {
+  // Check whether the defaults have been installed before.
+  if (!variable_get('openadstream_defaults_installed', FALSE)) {
+    // Add the default gutters.
+    openadstream_default_gutters();
+    variable_set('openadstream_defaults_installed', TRUE);
+  }
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function openadstream_uninstall() {
+  drupal_uninstall_schema('openadstream');
+  _block_rehash();
+  variable_del('openadstream_defaults_installed');
+}
+
+/**
+ * Implementation of hook_update_N().
+ */
+function openadstream_update_6301() {
+  $ret = array();
+  
+  // Add the new description field.
+  $spec = array(
+    'type' => 'varchar',
+    'length' => 100,
+    'not null' => TRUE,
+    'default' => '',
+  );
+  db_add_field($ret, 'openadstream_positions', 'description', $spec);
+
+  return $ret;
+}
+
+/**
+ * Implementation of hook_update_N().
+ */
+function openadstream_update_6302() {
+  $ret = array();
+  
+  // Add the new gutters table.
+  $schema = openadstream_schema();
+  db_create_table($ret, 'openadstream_gutters', $schema['openadstream_gutters']);
+  
+  // Add the default gutters.
+  openadstream_default_gutters();
+  $ret[] = array('success' => TRUE, 'query' => "Added some default gutter ad settings to get you started.");
+  
+  return $ret;
+}
+
+/**
+ * Implementation of hook_update_N().
+ */
+function openadstream_update_6303() {
+  $ret = array();
+  
+  // Add the new background color field.
+  $spec = array(
+    'type' => 'char',
+    'length' => 7,
+    'not null' => TRUE,
+    'default' => '',
+  );
+  db_add_field($ret, 'openadstream_gutters', 'bgcolor', $spec);
+  
+  return $ret;
+}
+
+/**
+ * Implementation of hook_update_N().
+ */
+function openadstream_update_6304() {
+  $ret = array();
+  
+  // Check whether the defaults have been installed before.
+  if (!variable_get('openadstream_defaults_installed', FALSE)) {
+    // Add the default gutters.
+    openadstream_default_gutters();
+    variable_set('openadstream_defaults_installed', TRUE);
+    $ret[] = array('success' => TRUE, 'query' => "Added some default gutter ad settings to get you started.");
+  }
+  else {
+    $ret[] = array('success' => TRUE, 'query' => "Default gutter ad settings already loaded.");
+  }
+  
+  return $ret;
+}
+
+/**
+ * Add default gutters.
+ */
+function openadstream_default_gutters() {
+  // Add a default include gutter.
+  $obj = new stdClass;
+  $obj->path = '*';
+  $obj->is_include = TRUE;
+  drupal_write_record('openadstream_gutters', $obj);
+
+  // Add a default exclude gutter.
+  $obj->path = "admin\nadmin/*\nnode/add\nnode/add/*\nnode/*/edit";
+  $obj->is_include = FALSE;
+  drupal_write_record('openadstream_gutters', $obj);
+}
