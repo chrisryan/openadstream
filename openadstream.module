@@ -108,7 +108,7 @@ function openadstream_gather_tags() {
 
 function openadstream_openadstream_tags() {
   if (arg(0) == 'node' && is_numeric(arg(1)) && $node = node_load(arg(1))) {
-    $ret = db_fetch_array(db_query('SELECT * FROM {openadstream_tags} WHERE vid = %d', $node->vid));
+    $ret = db_query('SELECT * FROM {openadstream_tags} WHERE vid = %d', $node->vid)->fetchAssoc();
     if ($ret && $ret['tags']) {
       return explode(',', $ret['tags']);
     }
@@ -339,7 +339,7 @@ function openadstream_form_alter(&$form, $form_state, $form_id) {
             $default_value = $pagename;
           }
           $node = $form['#node'];
-          $items = db_fetch_array(db_query('SELECT * FROM {openadstream_tags} WHERE vid = %d', $node->vid));
+          $items = db_query('SELECT * FROM {openadstream_tags} WHERE vid = %d', $node->vid)->fetchAssoc();
           $tags = $items->tags;
         }
 
@@ -412,7 +412,7 @@ function openadstream_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
 function _openadstream_admin_positions() {
   $positions = array();
   $results = db_query("SELECT position_id, name, description FROM {openadstream_positions} ORDER BY name ASC");
-  while ($position = db_fetch_array($results)) {
+  while ($position = $results->fetchAssoc()) {
     $positions[] = $position;
   }
   return $positions;
@@ -556,7 +556,7 @@ function _openadstream_node_pagename($nid) {
 function _openadstream_admin_pagenames() {
   $results = db_query("SELECT * FROM {openadstream_pagenames} ORDER BY weight ASC, pagename_id ASC");
   $pagenames = array();
-  while ($pagename = db_fetch_array($results)) {
+  while ($pagename = $results->fetchAssoc()) {
     $pagenames[] = $pagename;
   }
   
@@ -899,7 +899,7 @@ function _openadstream_list_gutters($type) {
 
   // Compile the data.
   $gutters = array('include' => array(), 'exclude' => array());
-  while ($gutter = db_fetch_array($results)) {
+  while ($gutter = $results->fetchAssoc()) {
     if ($gutter['is_include']) {
       $gutters['include'][] = $gutter;
     }
@@ -929,7 +929,7 @@ function _openadstream_list_gutters_all() {
 
   // Compile the data.
   $gutters = array('include' => array(), 'exclude' => array());
-  while ($gutter = db_fetch_array($results)) {
+  while ($gutter = $results->fetchAssoc()) {
     if ($gutter['is_include']) {
       $gutters['include'][$gutter['id']] = $gutter;
     }

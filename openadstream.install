@@ -157,7 +157,6 @@ function openadstream_schema() {
  * Implementation of hook_install().
  */
 function openadstream_install() {
-  drupal_install_schema('openadstream');
 }
 
 /**
@@ -176,7 +175,6 @@ function openadstream_enable() {
  * Implementation of hook_uninstall().
  */
 function openadstream_uninstall() {
-  drupal_uninstall_schema('openadstream');
   _block_rehash();
   variable_del('openadstream_defaults_installed');
 }
@@ -265,6 +263,7 @@ function openadstream_default_gutters() {
   drupal_write_record('openadstream_gutters', $obj);
 
   // Add a default exclude gutter.
+  $obj = new stdClass;
   $obj->path = "admin\nadmin/*\nnode/add\nnode/add/*\nnode/*/edit";
   $obj->is_include = FALSE;
   drupal_write_record('openadstream_gutters', $obj);

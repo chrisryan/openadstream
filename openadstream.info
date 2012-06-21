@@ -1,13 +1,6 @@
 ; $Id: openadstream.info,v 1.1 2009/12/04 03:20:47 damienmckenna Exp $
 name = Open AdStream Integration
 description = Tool for managing advertisement blocks for 24/7 Real Media's Open AdStream ad service.
-version = 6.x-3.0
+version = 7.x-1.0
 package = Ad
-core = 6.x
-
-; Information added by drupal.org packaging script on 2010-01-19
-version = "6.x-3.3"
-core = "6.x"
-project = "openadstream"
-datestamp = "1263880506"
-
+core = 7.x
