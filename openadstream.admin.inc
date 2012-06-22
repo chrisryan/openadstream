@@ -162,7 +162,7 @@ function openadstream_admin_gutters_list($type) {
     t('Operations'),
   );
 
-  $now = time();
+  $now = REQUEST_TIME;
 
   // Compile the gutter records.
   $rows = array();
@@ -201,12 +201,12 @@ function openadstream_admin_gutters_list($type) {
         'actions' => l('edit', 'admin/build/openadstream/gutters-edit/' . $gutter['id'])
           . ', ' . l('delete', 'admin/build/openadstream/gutters-delete/' . $gutter['id']),
       ),
-      'class' => implode(' ', $classes),
+      'class' => $classes,
     );
   }
   $form[$type . 's']['table'] = array(
     '#type' => 'markup',
-    '#value' => theme('table', $header, $rows),
+    '#markup' => theme('table', array('header' => $header, 'rows' => $rows)),
   );
   
   return $form;
@@ -223,7 +223,7 @@ function openadstream_admin_gutters_add() {
  * Show the New Gutters Ad form.
  */
 function openadstream_admin_gutters_edit($form, $id) {
-  $gutter = db_fetch_array(db_query("SELECT g.id, g.path, g.date_from, g.date_to, g.is_include FROM {openadstream_gutters} g WHERE id=%d", $id));
+  $gutter = db_fetch_array(db_query("SELECT g.id, g.path, g.date_from, g.date_to, g.is_include FROM {openadstream_gutters} g WHERE id=:id", array(':id' => $id)));
   kpr($id);
   return openadstream_admin_gutters_form($gutter);
 }
@@ -321,9 +321,10 @@ function openadstream_admin_gutters_form($gutter = array()) {
     '#description' => 'The color code for the page background.  This is only applicable for paths that are included.  Optional.',
   );
   
-  $form['submit'] = array(
+  $form['actions'] = array('#type' => 'actions');
+  $form['actions']['submit'] = array(
     '#type' => 'submit',
-    '#value' => 'Save',
+    '#value' => 'Save'
   );
   
   return $form;
@@ -447,9 +448,9 @@ function openadstream_admin_gutters_edit_submit($form, &$form_state) {
  * Verify the user wants to delete a gutter ad setting.
  */
 function openadstream_admin_gutters_delete(&$form_state, $gutter_id) {
-  $gutter = db_fetch_array(db_query("SELECT g.id, g.path, g.date_from, g.date_to, g.is_include FROM {openadstream_gutters} g WHERE g.id = %d", $gutter_id));
+  $gutter = db_fetch_array(db_query("SELECT g.id, g.path, g.date_from, g.date_to, g.is_include FROM {openadstream_gutters} g WHERE g.id = :gid", array(':gid' => $gutter_id)));
   
-  drupal_set_title(t("Gutter Ad"));
+  drupal_set_title(t("Gutter Ad"), PASS_THROUGH);
   
   $form = array(
     'id' => array(
@@ -471,7 +472,9 @@ function openadstream_admin_gutters_delete(&$form_state, $gutter_id) {
  */
 function openadstream_admin_gutters_delete_submit($formid, &$form_state) {
   if ($form_state['values']['confirm']) {
-    db_query("DELETE FROM {openadstream_gutters} WHERE id = %d", $form_state['values']['id']);
+    db_delete('openadstream_gutters')
+      ->condition('id', $form_state['values']['id'])
+      ->execute();
     _openadstream_clear_gutters_cache();
     drupal_set_message(t('The gutter has been deleted.'));
   }
@@ -502,7 +505,7 @@ function openadstream_admin_positions() {
     );
   }
   $output .= "<h3>" . t('Existing Positions') . "</h3>\n";
-  $output .= theme('table', $header, $rows);
+  $output .= theme('table', array('header' => $header, 'rows' => $rows));
   $output .= "<br />\n";
 
   // Default positions.
@@ -524,7 +527,7 @@ function openadstream_admin_positions() {
   }
   
   $output .= "<h3>" .  t('Default Positions') . "</h3>\n";
-  $output .= theme('table', $header, $rows);
+  $output .= theme('table', array('header' => $header, 'rows' => $rows));
 
   return $output;
 }
@@ -568,23 +571,28 @@ function openadstream_admin_positions_add() {
 function openadstream_admin_positions_add_validate($form, &$form_state) {
   $values = $form_state['values'];
   
-  if (db_result(db_query("SELECT COUNT(*) FROM {openadstream_positions} WHERE name = '%s'", $values['position_name']))) {
+  if (db_query("SELECT COUNT(*) FROM {openadstream_positions} WHERE name = ':name'", array(':name' => $values['position_name']))->fetchField()) {
     form_set_error('info', t('The position name %name is already in use', array('%name' => $values['position_name'])));
   }
 }
 
 function openadstream_admin_positions_add_submit($form, &$form_state) {
   $values = $form_state['values'];
-  db_query("INSERT INTO {openadstream_positions} (name, description) VALUES ('%s', '%s')", $values['position_name'], $values['position_description']);
+  $id = db_insert('openadstream_positions')
+    ->fields(array(
+      'name' => $values['position_name'],
+      'description' => $values['position_description']
+    ))
+    ->execute();
   _openadstream_clear_positions_cache();
   drupal_set_message(t('The position %name has been created', array('%name' => $values['position_name'])));
   drupal_goto('admin/build/openadstream/positions');
 }
 
 function openadstream_admin_positions_delete(&$form_state, $position_id) {
-  $position = db_fetch_array(db_query("SELECT * FROM {openadstream_positions} WHERE position_id = %d", $position_id));
+  $position = db_fetch_array(db_query("SELECT * FROM {openadstream_positions} WHERE position_id = :pid", array(':pid' => $position_id)));
   
-  drupal_set_title(t("Position '@name'", array('@name' => $position['name'])));
+  drupal_set_title(t("Position '@name'", array('@name' => $position['name'])), PASS_THROUGH);
   
   $form = array(
     'position_id' => array(
@@ -603,7 +611,9 @@ function openadstream_admin_positions_delete(&$form_state, $position_id) {
 
 function openadstream_admin_positions_delete_submit($formid, &$form_state) {
   if ($form_state['values']['confirm']) {
-    db_query("DELETE FROM {openadstream_positions} WHERE position_id = %d", $form_state['values']['position_id']);
+    db_delete('openadstream_positions')
+      ->condition('position_id', $form_state['values']['position_id'])
+      ->execute();
     _openadstream_clear_positions_cache();
     drupal_set_message(t('The position has been deleted'));
   }
@@ -649,7 +659,7 @@ function openadstream_admin_pagenames() {
   }
 
   $output .= "<h3>" . t('Custom Pagenames') . "</h3>\n";
-  $output .= theme('table', $header, $rows);
+  $output .= theme('table', array('header' => $header, 'rows' => $rows));
   $output .= "<br />\n";
 
   // Compile the default pagenames.
@@ -672,7 +682,7 @@ function openadstream_admin_pagenames() {
   }
   
   $output .= "<h3>" . t('Default Pagenames') . "</h3>\n";
-  $output .= theme('table', $header, $rows);
+  $output .= theme('table', array('header' => $header, 'rows' => $rows));
   return $output;
 }
 
@@ -723,7 +733,7 @@ function openadstream_admin_pagenames_add() {
 }
 
 function openadstream_admin_pagenames_edit(&$form_state, $pagename_id) {
-  $pagename = db_fetch_array(db_query("SELECT * FROM {openadstream_pagenames} WHERE pagename_id = %d", $pagename_id));
+  $pagename = db_fetch_array(db_query("SELECT * FROM {openadstream_pagenames} WHERE pagename_id = :pid", array(':pid' => $pagename_id)));
   
   $form = array();
   
@@ -779,8 +789,14 @@ function openadstream_admin_pagenames_edit(&$form_state, $pagename_id) {
 
 function openadstream_admin_pagenames_edit_submit($form, &$form_state) {
   $values = $form_state['values'];
-  $sql = "UPDATE {openadstream_pagenames} SET pagename = '%s', weight = %d, path = '%s' WHERE pagename_id = %d";
-  db_query($sql, $values['pagename'], $values['weight'], $values['path'], $values['pagename_id']);
+  db_update('openadstream_pagenames')
+    ->field(array(
+      'pagename' => $values['pagename'],
+      'weight' => $values['weight'],
+      'path' => $values['path']
+    ))
+    ->condition('pagename_id', $values['pagename_id'])
+    ->execute();
   _openadstream_clear_pagenames_cache();
   drupal_set_message('Pagename pagename has been updated');
   drupal_goto('admin/build/openadstream/pagenames');
@@ -788,17 +804,22 @@ function openadstream_admin_pagenames_edit_submit($form, &$form_state) {
 
 function openadstream_admin_pagenames_add_submit($form, &$form_state) {
   $values = $form_state['values'];
-  $sql = "INSERT INTO {openadstream_pagenames} (pagename, weight, path) VALUES ('%s', %d, '%s')";
-  db_query($sql, $values['pagename'], $values['weight'], $values['path']);
+  $id = db_insert('openadstream_pagenames')
+    ->fields(array(
+      'pagename' => $values['pagename'],
+      'weight' => $values['weight'],
+      'path' => $values['path']
+    ))
+    ->execute();
   _openadstream_clear_pagenames_cache();
   drupal_set_message(t('The pagename pagename %name has been created', array('%name' => $values['pagename'])));
   drupal_goto('admin/build/openadstream/pagenames');
 }
 
 function openadstream_admin_pagenames_delete(&$form_state, $pagename_id) {
-  $pagename = db_fetch_array(db_query("SELECT * FROM {openadstream_pagenames} WHERE pagename_id = %d", $pagename_id));
+  $pagename = db_fetch_array(db_query("SELECT * FROM {openadstream_pagenames} WHERE pagename_id = :pid", array(':pid' => $pagename_id)));
   
-  drupal_set_title(t("Pagename '@name'", array('@name' => $pagename['pagename'])));
+  drupal_set_title(t("Pagename '@name'", array('@name' => $pagename['pagename'])), PASS_THROUGH);
   
   $form = array(
     'pagename_id' => array(
@@ -817,7 +838,9 @@ function openadstream_admin_pagenames_delete(&$form_state, $pagename_id) {
 
 function openadstream_admin_pagenames_delete_submit($formid, &$form_state) {
   if ($form_state['values']['confirm']) {
-    db_query("DELETE FROM {openadstream_pagenames} WHERE pagename_id = %d", $form_state['values']['pagename_id']);
+    db_delete('openadstream_pagenames')
+      ->condition('pagename_id', $form_state['values']['pagename_id'])
+      ->execute();
     _openadstream_clear_pagenames_cache();
     drupal_set_message(t('The pagename has been deleted'));
   }

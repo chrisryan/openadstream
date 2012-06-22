@@ -4,3 +4,4 @@ description = Tool for managing advertisement blocks for 24/7 Real Media's Open 
 version = 7.x-1.0
 package = Ad
 core = 7.x
+configure = admin/build/openadstream

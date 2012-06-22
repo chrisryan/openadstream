@@ -6,7 +6,7 @@
  */
 
 /**
- * Implementation of hook_ctools_content_types().
+ * Implements hook_ctools_content_types().
  */
 function openadstream_ads_ctools_content_types() {
   return array(
@@ -45,7 +45,7 @@ function _openadstream_ads_content_type_content_type($ad) {
 }
 
 /**
- * Implementation of hook_ctools_content_type_render().
+ * Implements hook_ctools_content_type_render().
  */
 function openadstream_ads_content_type_render($subtype, $conf, $panel_args, $contexts) {
   $block = new StdClass;
@@ -57,14 +57,14 @@ function openadstream_ads_content_type_render($subtype, $conf, $panel_args, $con
 }
 
 /**
- * Implementation of hook_ctools_content_type_admin_title().
+ * Implements hook_ctools_content_type_admin_title().
  */
 function openadstream_ads_content_type_admin_title($subtype, $conf, $contexts) {
   return 'Open AdStream Ads: ' . $subtype;
 }
 
 /**
- * Implementation of hook_ctools_content_type_admin_info().
+ * Implements hook_ctools_content_type_admin_info().
  */
 function openadstream_ads_content_type_admin_info($subtype, $conf, $contexts) {
   $block = new StdClass;

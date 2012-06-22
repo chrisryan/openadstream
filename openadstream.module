@@ -6,18 +6,18 @@
  */
 
 /**
- * Implementation of hook_theme().
+ * Implements hook_theme().
  */
 function openadstream_theme() {
   return array(
     'openadstream_preprocess_page' => array(
-      'arguments' => array('vars' => NULL),
+      'variables' => array('vars' => NULL),
     ),
   );
 }
 
 /**
- * Implementation of hook_preprocess_page().
+ * Implements hook_preprocess_page().
  */
 function openadstream_preprocess_page(&$variables) {
   // Assign the hostname, use the server_name variable if it's blank.
@@ -71,7 +71,11 @@ function openadstream_preprocess_page(&$variables) {
 
   // Load the gutter advertisements if they are wanted.
   if (variable_get('openadstream_gutter_enabled', FALSE)) {
-    $variables['closure'] .= _openadstream_gutters();
+    $gutters = _openadstream_gutters();
+    if(isset($variables['closure']))
+      $variables['closure'] .= $gutters;
+    else
+      $variables['closure'] = $gutters;
   }
 
   // Grab an array of all of the current tags.
@@ -83,7 +87,7 @@ function openadstream_preprocess_page(&$variables) {
     $oas = _openadstream_js($hostname, $pagename, openadstream_positions(), $tags);
 
     // Add the compiled headers.
-    drupal_set_html_head($oas);
+    drupal_add_html_head($oas);
   
     // Compile the HTML head values.
     $variables['head'] = drupal_get_html_head();
@@ -108,7 +112,7 @@ function openadstream_gather_tags() {
 
 function openadstream_openadstream_tags() {
   if (arg(0) == 'node' && is_numeric(arg(1)) && $node = node_load(arg(1))) {
-    $ret = db_query('SELECT * FROM {openadstream_tags} WHERE vid = %d', $node->vid)->fetchAssoc();
+    $ret = db_query('SELECT * FROM {openadstream_tags} WHERE vid = :vid', array(':vid' => $node->vid))->fetchAssoc();
     if ($ret && $ret['tags']) {
       return explode(',', $ret['tags']);
     }
@@ -135,14 +139,31 @@ function openadstream_positions($position = NULL) {
 }
 
 /**
- * Implementation of hook_perm().
+ * Implements hook_permission().
  */
-function openadstream_perm() {
-  return array('administer openadstream configuration', 'configure openadstream node pagenames', 'configure openadstream gutter ads', 'configure openadstream pagenames');
+function openadstream_permission() {
+  return array(
+    'administer openadstream configuration' => array(
+      'title' => t('Administer Open AdStream Configuration'),
+      'description' => t('Site wide configuration options.')
+    ),
+    'configure openadstream node pagenames' => array(
+      'title' => t('Configure Open AdStream Node page names'),
+      'description' => t('Add/Change Node Page Name options for overriding the default node page name value.')
+    ),
+    'configure openadstream gutter ads' => array(
+      'title' => t('Configure Open AdStream Gutter Ads'),
+      'description' => t('Add/Change Gutter Ad options for the site.')
+    ),
+    'configure openadstream pagenames' => array(
+      'title' => t('Configure Open AdStream page names'),
+      'description' => t('Add/Change Page Name options for overriding the default page name value.')
+    )
+  );
 }
 
 /**
- * Implementation of hook_menu().
+ * Implements hook_menu().
  */
 function openadstream_menu() {
   $items = array();
@@ -294,27 +315,29 @@ function openadstream_access_positions() {
 }
 
 /**
- * Implementation of hook_block().
+ * Implements hook_block_view().
  */
-function openadstream_block($op = 'list', $delta = 0, $edit = array()) {
-  if ($op == 'list') {
-    $blocks = array();
-    foreach (_openadstream_positions() as $position) {
-      $blocks[$position['name']] = array('info' => 'Open AdStream Ad: '. $position['name']);
-    }
-    return $blocks;
-  }
-  else if ($op == 'view') {
-    $block = array(
-      'subject' => '',
-      'content' => _openadstream_block_js($delta),
-    );
-    return $block;
-  }
+function openadstream_block_view($delta = '') {
+  $block = array(
+    'subject' => '',
+    'content' => _openadstream_block_js($delta),
+  );
+  return $block;
 }
 
 /**
- * Implementation of hook_ctools_plugin_directory().
+ * Implements hook_block_info().
+ */
+function openadstream_block_info() {
+  $blocks = array();
+  foreach (_openadstream_positions() as $position) {
+    $blocks[$position['name']] = array('info' => 'Open AdStream Ad: '. $position['name']);
+  }
+  return $blocks;
+}
+
+/**
+ * Implements hook_ctools_plugin_directory().
  */
 function openadstream_ctools_plugin_directory($module, $plugin) {
   if ($module == 'ctools') {
@@ -323,7 +346,7 @@ function openadstream_ctools_plugin_directory($module, $plugin) {
 }
 
 /**
- * Implementation of hook_form_alter().
+ * Implements hook_form_alter().
  */
 function openadstream_form_alter(&$form, $form_state, $form_id) {
   if (isset($form['type']) && isset($form['#node'])) {
@@ -339,7 +362,7 @@ function openadstream_form_alter(&$form, $form_state, $form_id) {
             $default_value = $pagename;
           }
           $node = $form['#node'];
-          $items = db_query('SELECT * FROM {openadstream_tags} WHERE vid = %d', $node->vid)->fetchAssoc();
+          $items = db_query('SELECT * FROM {openadstream_tags} WHERE vid = :vid', array(':vid' => $node->vid))->fetchAssoc();
           $tags = $items->tags;
         }
 
@@ -371,36 +394,52 @@ function openadstream_form_alter(&$form, $form_state, $form_id) {
 }
 
 /**
- * Implementation of hook_nodeapi().
+ * Implements hook_insert().
  */
-function openadstream_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
-  switch ($op) {
-    case 'insert':
-    case 'update':
-      // Only process the pagename node settings if the user has permission.
-      if (user_access('administer openadstream configuration') || user_access('configure openadstream node pagenames')) {
-        db_query("DELETE FROM {openadstream_node_pagenames} WHERE nid = %d", $node->nid);
-        if (!empty($node->openadstream_pagename)) {
-          $sql = "INSERT INTO {openadstream_node_pagenames} (nid, pagename) VALUES (%d, '%s')";
-          db_query($sql, $node->nid, $node->openadstream_pagename);
-        }
+function openadstream_insert(&$node) {
+  // We handle insert/update the same; a hold over from drupal 6 to 7 conversion
+  openadstream_update($node);
+}
 
-        $obj = new stdClass;
-        $obj->vid = $node->vid;
-        $obj->nid = $node->nid;
-        $obj->tags = $node->openadstream_tags;
-        drupal_write_record('openadstream_tags', $obj, array('vid'));
-        if (!db_affected_rows()) {
-          drupal_write_record('openadstream_tags', $obj);
-        }
-      }
-      break;
+/**
+ * Implements hook_update().
+ */
+function openadstream_update(&$node) {
+  // Only process the pagename node settings if the user has permission.
+  if (user_access('administer openadstream configuration') || user_access('configure openadstream node pagenames')) {
+    db_delete('openadstream_node_pagenames')
+      ->condition('nid', $node->nid)
+      ->execute();
+    if (!empty($node->openadstream_pagename)) {
+      $id = db_insert('openadstream_node_pagenames')
+        ->fields(array(
+          'nid' => $node->nid,
+          'pagename' => $node->openadstream_pagename
+        ))
+        ->execute();
+    }
 
-    case 'delete':
-      db_query("DELETE FROM {openadstream_node_pagenames} WHERE nid = %d", $node->nid);
-      db_query("DELETE FROM {openadstream_tags} WHERE nid = %d", $node->nid);
-      break;
+    $obj = new stdClass;
+    $obj->vid = $node->vid;
+    $obj->nid = $node->nid;
+    $obj->tags = $node->openadstream_tags;
+    drupal_write_record('openadstream_tags', $obj, array('vid'));
+    if (!db_affected_rows()) {
+      drupal_write_record('openadstream_tags', $obj);
+    }
   }
+}
+
+/**
+ * Implements hook_delete().
+ */
+function openadstream_delete(&$node) {
+  db_delete('openadstream_node_pagenames')
+    ->condition('nid', $node->nid)
+    ->execute();
+  db_delete('openadstream_tags')
+    ->condition('nid', $node->nid)
+    ->execute();
 }
 
 /**
@@ -547,7 +586,7 @@ JS;
  *   Pagename or FALSE if no pagename exists
  */
 function _openadstream_node_pagename($nid) {
-  return db_result(db_query("SELECT pagename FROM {openadstream_node_pagenames} WHERE nid = %d", $nid));
+  return db_query("SELECT pagename FROM {openadstream_node_pagenames} WHERE nid = :nid", array(':nid' => $nid))->fetchField();
 }
 
 /**
@@ -759,7 +798,7 @@ function _openadstream_gutters() {
   if ($left || $right) {
   
     // The time right now, used for calculations later.
-    $now = time();
+    $now = REQUEST_TIME;
     // Paths that should be included.
     $include = trim(variable_get('openadstream_gutter_path_include', '*'));
     // Paths that should be excluded.
@@ -831,42 +870,42 @@ function _openadstream_gutters_output($bgcolor = '') {
   $js .= "<script type=\"text/javascript\">\n";
   // Make sure that the DOM object exists on the page by wrapping
   // everything around it.
-  $js .= "$('{$dom}').ready(function() {\n";
+  $js .= "jQuery('{$dom}').ready(function() {\n";
   // Store it as a variable, makes it easier to reuse.
   $js .= "  var gutter_resize = function() {\n";
   // Work out the width of the gutter.
-  $js .= "    var gutter_width = parseInt((document.body.clientWidth - $('{$dom}').width()) / 2) - {$padding};\n";
+  $js .= "    var gutter_width = parseInt((document.body.clientWidth - jQuery('{$dom}').width()) / 2) - {$padding};\n";
   // Work out the height of the gutter.
   $js .= "    var gutter_height = document.body.clientHeight;\n";
   // If present, add the background-color.
   if (!empty($bgcolor)) {
-    $js .= "    $('body').attr('style', 'background-color:{$bgcolor};');\n";
+    $js .= "    jQuery('body').attr('style', 'background-color:{$bgcolor};');\n";
   }
 
   // Compile the left gutter.
   if ($left) {
     // Have to run through the block function to hit all the switches.
-    $block = openadstream_block('view', $left);
+    $block = openadstream_block_view($left);
     // Output the full block.
     $output .= "<div id=\"oas-gutter-left\" style=\"position:absolute;top:0;left:0;overflow:hidden;\">" . $block['content'] . "</div>\n";
     // Add the JS.
-    $js .= "    $('#oas-gutter-left').width(gutter_width).height(gutter_height);\n";
+    $js .= "    jQuery('#oas-gutter-left').width(gutter_width).height(gutter_height);\n";
   }
   // Compile the right gutter.
   if ($right) {
     // Have to run through the block function to hit all the switches.
-    $block = openadstream_block('view', $right);
+    $block = openadstream_block_view($right);
     // Output the full block.
     $output .= "<div id=\"oas-gutter-right\" style=\"position:absolute;top:0;right:0;overflow:hidden;\">" . $block['content'] . "</div>\n";
     // Add the JS.
-    $js .= "    $('#oas-gutter-right').width(gutter_width).height(gutter_height);\n";
+    $js .= "    jQuery('#oas-gutter-right').width(gutter_width).height(gutter_height);\n";
   }
 
   // Close the JS function.
   $js .= "  };\n";
 
   // Resize the gutter every time the window is resized.
-  $js .= "  $(window).resize(gutter_resize);\n";
+  $js .= "  jQuery(window).resize(gutter_resize);\n";
   // Resize the gutter immediately.
   $js .= "  gutter_resize();\n";
   
@@ -894,8 +933,8 @@ function _openadstream_list_gutters($type) {
   }
 
   // Nothing found, so build the list.
-  $now = time();
-  $results = db_query("SELECT g.id, g.path, g.date_from, g.date_to, g.is_include FROM {openadstream_gutters} g WHERE g.date_from <= %d OR g.date_from = 0 ORDER BY g.is_include, g.date_from DESC, g.date_to DESC", $now);
+  $now = REQUEST_TIME;
+  $results = db_query("SELECT g.id, g.path, g.date_from, g.date_to, g.is_include FROM {openadstream_gutters} g WHERE g.date_from <= :now OR g.date_from = 0 ORDER BY g.is_include, g.date_from DESC, g.date_to DESC", array(':now' => $now));
 
   // Compile the data.
   $gutters = array('include' => array(), 'exclude' => array());
@@ -921,11 +960,11 @@ function _openadstream_list_gutters($type) {
  */
 function _openadstream_list_gutters_all() {
   // Nothing found, so build the list.
-  $now = time();
+  $now = REQUEST_TIME;
   $results = db_query("SELECT g.id, g.path, g.date_from, g.date_to, g.is_include, g.bgcolor
     FROM {openadstream_gutters} g
-    WHERE g.date_from <= %d OR g.date_from = 0
-    ORDER BY g.is_include, g.date_from DESC, g.date_to DESC", $now);
+    WHERE g.date_from <= :now OR g.date_from = 0
+    ORDER BY g.is_include, g.date_from DESC, g.date_to DESC", array(':now' => $now));
 
   // Compile the data.
   $gutters = array('include' => array(), 'exclude' => array());

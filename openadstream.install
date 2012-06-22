@@ -2,11 +2,11 @@
 // $Id: openadstream.install,v 1.1.2.6 2009/12/17 04:31:46 damienmckenna Exp $
 /**
  * @file
- * Installation and update scripts for Open AdStream.
+ * Install, update and uninstall functions for the Open AdStream module.
  */
 
 /**
- * Implementation of hook_schema().
+ * Implements hook_schema().
  */
 function openadstream_schema() {
   $schema = array();
@@ -154,13 +154,7 @@ function openadstream_schema() {
 }
 
 /**
- * Implementation of hook_install().
- */
-function openadstream_install() {
-}
-
-/**
- * Implementation of hook_enable().
+ * Implements hook_enable().
  */
 function openadstream_enable() {
   // Check whether the defaults have been installed before.
@@ -172,7 +166,7 @@ function openadstream_enable() {
 }
 
 /**
- * Implementation of hook_uninstall().
+ * Implements hook_uninstall().
  */
 function openadstream_uninstall() {
   _block_rehash();
@@ -180,11 +174,9 @@ function openadstream_uninstall() {
 }
 
 /**
- * Implementation of hook_update_N().
+ * Add the new description field
  */
 function openadstream_update_6301() {
-  $ret = array();
-  
   // Add the new description field.
   $spec = array(
     'type' => 'varchar',
@@ -192,34 +184,30 @@ function openadstream_update_6301() {
     'not null' => TRUE,
     'default' => '',
   );
-  db_add_field($ret, 'openadstream_positions', 'description', $spec);
+  db_add_field('openadstream_positions', 'description', $spec);
 
-  return $ret;
+  return t('Updated Open AdStream positions table.');
 }
 
 /**
- * Implementation of hook_update_N().
+ * Add the new gutters table and the default gutters
  */
 function openadstream_update_6302() {
-  $ret = array();
-  
   // Add the new gutters table.
   $schema = openadstream_schema();
-  db_create_table($ret, 'openadstream_gutters', $schema['openadstream_gutters']);
+  db_create_table('openadstream_gutters', $schema['openadstream_gutters']);
   
   // Add the default gutters.
   openadstream_default_gutters();
   $ret[] = array('success' => TRUE, 'query' => "Added some default gutter ad settings to get you started.");
   
-  return $ret;
+  return t('Updated Open AdStream adding gutters table.');
 }
 
 /**
- * Implementation of hook_update_N().
+ * Add the new background color field
  */
 function openadstream_update_6303() {
-  $ret = array();
-  
   // Add the new background color field.
   $spec = array(
     'type' => 'char',
@@ -227,29 +215,26 @@ function openadstream_update_6303() {
     'not null' => TRUE,
     'default' => '',
   );
-  db_add_field($ret, 'openadstream_gutters', 'bgcolor', $spec);
+  db_add_field('openadstream_gutters', 'bgcolor', $spec);
   
-  return $ret;
+  return t('Updated Open AdStream gutters table.');
 }
 
 /**
- * Implementation of hook_update_N().
+ * Check if default gutters were installed, installing if they were not
+ * and then marking a new variable setting indicating defaults installed.
  */
 function openadstream_update_6304() {
-  $ret = array();
-  
   // Check whether the defaults have been installed before.
   if (!variable_get('openadstream_defaults_installed', FALSE)) {
     // Add the default gutters.
     openadstream_default_gutters();
     variable_set('openadstream_defaults_installed', TRUE);
-    $ret[] = array('success' => TRUE, 'query' => "Added some default gutter ad settings to get you started.");
+    return t('Added some default gutter ad settings to get you started.');
   }
   else {
-    $ret[] = array('success' => TRUE, 'query' => "Default gutter ad settings already loaded.");
+    return = t('Default gutter ad settings already loaded.');
   }
-  
-  return $ret;
 }
 
 /**
