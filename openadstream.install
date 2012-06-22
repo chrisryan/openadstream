@@ -233,7 +233,7 @@ function openadstream_update_6304() {
     return t('Added some default gutter ad settings to get you started.');
   }
   else {
-    return = t('Default gutter ad settings already loaded.');
+    return t('Default gutter ad settings already loaded.');
   }
 }
 

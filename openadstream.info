@@ -5,3 +5,4 @@ version = 7.x-1.0
 package = Ad
 core = 7.x
 configure = admin/build/openadstream
+dependencies[] = date_api
