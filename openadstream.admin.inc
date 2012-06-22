@@ -223,7 +223,7 @@ function openadstream_admin_gutters_add() {
  * Show the New Gutters Ad form.
  */
 function openadstream_admin_gutters_edit($form, $id) {
-  $gutter = db_fetch_array(db_query("SELECT g.id, g.path, g.date_from, g.date_to, g.is_include FROM {openadstream_gutters} g WHERE id=:id", array(':id' => $id)));
+  $gutter = db_query("SELECT g.id, g.path, g.date_from, g.date_to, g.is_include FROM {openadstream_gutters} g WHERE id=:id", array(':id' => $id))->fetchAssoc();
   kpr($id);
   return openadstream_admin_gutters_form($gutter);
 }
@@ -241,10 +241,10 @@ function openadstream_admin_gutters_form($gutter = array()) {
       '#value' => $gutter['id'],
     );
     if (!empty($gutter['date_from'])) {
-      $gutter['date_from'] = date_convert($gutter['date_from'], DATE_UNIX, DATE_DATETIME);
+      $gutter['date_from'] = date_format_date(new DateObject($gutter['date_from']), DATE_DATETIME);
     }
     if (!empty($gutter['date_to'])) {
-      $gutter['date_to'] = date_convert($gutter['date_to'], DATE_UNIX, DATE_DATETIME);
+      $gutter['date_to'] = date_format_date(new DateObject($gutter['date_to']), DATE_DATETIME);
     }
   }
   // Assign some defaults.
@@ -338,8 +338,8 @@ function openadstream_admin_gutters_add_validate($form, &$form_state) {
   
   // Make sure the From date is not after the Until date.
   if (!empty($values['date_to']) && !empty($values['date_to'])) {
-    $date_from = date_convert($values['date_from'], DATE_DATETIME, DATE_UNIX);
-    $date_to = date_convert($values['date_from'], DATE_DATETIME, DATE_UNIX);
+    $date_from = date_format_date(new DateObject($values['date_from']), DATE_UNIX);
+    $date_to = date_format_date(new DateObject($values['date_from']), DATE_UNIX);
     
     if ($date_from > $date_to) {
       form_set_error('date_from', t('The "From" date should not be after the "Until" date'));
@@ -360,7 +360,7 @@ function openadstream_admin_gutters_add_submit($form, &$form_state) {
 
   // Convert the date field to UNIX timestamp.
   if (!empty($values['date_from'])) {
-    $values['date_from'] = date_convert($values['date_from'], DATE_DATETIME, DATE_UNIX);
+    $values['date_from'] = date_format_date(new DateObject($values['date_from']), DATE_UNIX);
     $obj->date_from = $values['date_from'];
   }
   else {
@@ -369,7 +369,7 @@ function openadstream_admin_gutters_add_submit($form, &$form_state) {
 
   // Convert the date field to UNIX timestamp.
   if (!empty($values['date_to'])) {
-    $values['date_to'] = date_convert($values['date_to'], DATE_DATETIME, DATE_UNIX);
+    $values['date_to'] = date_format_date(new DateObject($values['date_to']), DATE_UNIX);
     $obj->date_to = $values['date_to'];
   }
   else {
@@ -394,8 +394,8 @@ function openadstream_admin_gutters_edit_validate($form, &$form_state) {
   
   // Make sure the From date is not after the Until date.
   if (!empty($values['date_to']) && !empty($values['date_to'])) {
-    $date_from = date_convert($values['date_from'], DATE_DATETIME, DATE_UNIX);
-    $date_to = date_convert($values['date_from'], DATE_DATETIME, DATE_UNIX);
+    $date_from = date_format_date(new DateObject($values['date_from']), DATE_UNIX);
+    $date_to = date_format_date(new DateObject($values['date_from']), DATE_UNIX);
     
     if ($date_from > $date_to) {
       form_set_error('date_from', t('The "From" date should not be after the "Until" date'));
@@ -418,7 +418,7 @@ function openadstream_admin_gutters_edit_submit($form, &$form_state) {
 
   // Convert the date field to UNIX timestamp.
   if (!empty($values['date_from'])) {
-    $values['date_from'] = date_convert($values['date_from'], DATE_DATETIME, DATE_UNIX);
+    $values['date_from'] = date_format_date(new DateObject($values['date_from']), DATE_UNIX);
     $obj->date_from = $values['date_from'];
   }
   else {
@@ -427,7 +427,7 @@ function openadstream_admin_gutters_edit_submit($form, &$form_state) {
 
   // Convert the date field to UNIX timestamp.
   if (!empty($values['date_to'])) {
-    $values['date_to'] = date_convert($values['date_to'], DATE_DATETIME, DATE_UNIX);
+    $values['date_to'] = date_format_date(new DateObject($values['date_to']), DATE_UNIX);
     $obj->date_to = $values['date_to'];
   }
   else {
@@ -448,7 +448,7 @@ function openadstream_admin_gutters_edit_submit($form, &$form_state) {
  * Verify the user wants to delete a gutter ad setting.
  */
 function openadstream_admin_gutters_delete(&$form_state, $gutter_id) {
-  $gutter = db_fetch_array(db_query("SELECT g.id, g.path, g.date_from, g.date_to, g.is_include FROM {openadstream_gutters} g WHERE g.id = :gid", array(':gid' => $gutter_id)));
+  $gutter = db_query("SELECT g.id, g.path, g.date_from, g.date_to, g.is_include FROM {openadstream_gutters} g WHERE g.id = :gid", array(':gid' => $gutter_id))->fetchAssoc();
   
   drupal_set_title(t("Gutter Ad"), PASS_THROUGH);
   
@@ -590,7 +590,7 @@ function openadstream_admin_positions_add_submit($form, &$form_state) {
 }
 
 function openadstream_admin_positions_delete(&$form_state, $position_id) {
-  $position = db_fetch_array(db_query("SELECT * FROM {openadstream_positions} WHERE position_id = :pid", array(':pid' => $position_id)));
+  $position = db_query("SELECT * FROM {openadstream_positions} WHERE position_id = :pid", array(':pid' => $position_id))->fetchAssoc();
   
   drupal_set_title(t("Position '@name'", array('@name' => $position['name'])), PASS_THROUGH);
   
@@ -733,7 +733,7 @@ function openadstream_admin_pagenames_add() {
 }
 
 function openadstream_admin_pagenames_edit(&$form_state, $pagename_id) {
-  $pagename = db_fetch_array(db_query("SELECT * FROM {openadstream_pagenames} WHERE pagename_id = :pid", array(':pid' => $pagename_id)));
+  $pagename = db_query("SELECT * FROM {openadstream_pagenames} WHERE pagename_id = :pid", array(':pid' => $pagename_id))->fetchAssoc();
   
   $form = array();
   
@@ -817,7 +817,7 @@ function openadstream_admin_pagenames_add_submit($form, &$form_state) {
 }
 
 function openadstream_admin_pagenames_delete(&$form_state, $pagename_id) {
-  $pagename = db_fetch_array(db_query("SELECT * FROM {openadstream_pagenames} WHERE pagename_id = :pid", array(':pid' => $pagename_id)));
+  $pagename = db_query("SELECT * FROM {openadstream_pagenames} WHERE pagename_id = :pid", array(':pid' => $pagename_id))->fetchAssoc();
   
   drupal_set_title(t("Pagename '@name'", array('@name' => $pagename['pagename'])), PASS_THROUGH);
   
