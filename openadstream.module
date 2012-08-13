@@ -86,8 +86,16 @@ function openadstream_preprocess_page(&$variables) {
     // Compile the final header output.
     $oas = _openadstream_js($hostname, $pagename, openadstream_positions(), $tags);
 
+  $element = array(
+    '#tag' => 'script', // The #tag is the html tag - <link />
+    '#value'=>$oas,
+    '#attributes' => array( // Set up an array of attributes inside the tag
+    'type' => 'text/javascript',
+    'charset' => 'utf-8'
+    ),
+  );
     // Add the compiled headers.
-    drupal_add_html_head($oas);
+    drupal_add_html_head($element, 'openadstream');
   
     // Compile the HTML head values.
     $variables['head'] = drupal_get_html_head();
@@ -526,8 +534,7 @@ function _openadstream_js($hostname, $pagename, $ad_positions, $tags='') {
   
   // Build the full URL to load the page JS.
   $src = $base_url . $hostname . "/' + p + '/" . rand() .'@'. implode(',', $ad_positions) . '?' . $tags;
-  $js = "<script type=\"text/javascript\">\n";
-  $js .= "<!--//--><![CDATA[//><!--\n";
+  $js = "<!--//--><![CDATA[//><!--\n";
   // The pagename found thus far.
   $js .= "var p='{$pagename}';\n";
   
@@ -558,7 +565,6 @@ function _openadstream_js($hostname, $pagename, $ad_positions, $tags='') {
 
   // Close the JS.
   $js .= "//--><!]]>\n";
-  $js .= "</script>\n";
 
   return $js;
 }
