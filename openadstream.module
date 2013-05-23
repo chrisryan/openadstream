@@ -578,7 +578,9 @@ function _openadstream_block_js($position) {
   $js = <<<JS
     <div class="oas-ad oas-{$position_lower}"><script type="text/javascript">
     <!--//--><![CDATA[//><!--
+jQuery(document).ready(function() {
     OAS_RICH('{$position}');
+});
     //--><!]]>
     </script></div>
 JS;
