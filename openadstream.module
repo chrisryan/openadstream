@@ -33,7 +33,7 @@ function openadstream_preprocess_page(&$variables) {
   if (!empty($query_string_var) && array_key_exists($_GET, $querystring_var)) {
     $pagename = $_GET[$querystring_var];
   }
-  
+
   // If nothing found yet, continue as normal.
   if (empty($pagename)) {
     // Check first for page name.
@@ -42,7 +42,7 @@ function openadstream_preprocess_page(&$variables) {
     if ($pagename == '') {
       $path = $_GET['q'];
       if ($alias = drupal_get_path_alias($_GET['q'])) {
-        $path = $alias; 
+        $path = $alias;
       }
       $pagename = $path;
     }
@@ -96,7 +96,7 @@ function openadstream_preprocess_page(&$variables) {
   );
     // Add the compiled headers.
     drupal_add_html_head($element, 'openadstream');
-  
+
     // Compile the HTML head values.
     $variables['head'] = drupal_get_html_head();
   }
@@ -114,7 +114,7 @@ function openadstream_gather_tags() {
   }
 
   $tags = array_unique($tags);
-  $output = implode(',', $tags); 
+  $output = implode(',', $tags);
   return $output;
 }
 
@@ -137,12 +137,12 @@ function openadstream_openadstream_tags() {
  */
 function openadstream_positions($position = NULL) {
   static $positions = array();
-  
+
   // If a position name was submitted, add it to the stack.
   if (!empty($position)) {
     $positions[] = $position;
   }
-  
+
   return $positions;
 }
 
@@ -175,7 +175,7 @@ function openadstream_permission() {
  */
 function openadstream_menu() {
   $items = array();
-  
+
   $items['admin/build/openadstream'] = array(
     'title' => 'Open AdStream',
     'description' => 'Configure the Open AdStream master code and advertisement blocks',
@@ -185,7 +185,7 @@ function openadstream_menu() {
     'file' => 'openadstream.admin.inc',
     'type' => MENU_NORMAL_ITEM,
   );
-  
+
   $items['admin/build/openadstream/general'] = array(
     'title' => 'Main Settings',
     'description' => 'Configure the Open AdStream master code and advertisement blocks',
@@ -207,7 +207,7 @@ function openadstream_menu() {
     'weight' => -2,
     'type' => MENU_LOCAL_TASK,
   );
-  
+
   $items['admin/build/openadstream/gutters-add'] = array(
     'title' => 'Add Gutter Ad',
     'page callback' => 'drupal_get_form',
@@ -235,7 +235,7 @@ function openadstream_menu() {
     'file' => 'openadstream.admin.inc',
     'type' => MENU_CALLBACK,
   );
-  
+
   $items['admin/build/openadstream/positions'] = array(
     'title' => 'Positions',
     'page callback' => 'openadstream_admin_positions',
@@ -244,7 +244,7 @@ function openadstream_menu() {
     'type' => MENU_LOCAL_TASK,
     'weight' => 1,
   );
-  
+
   $items['admin/build/openadstream/positions-add'] = array(
     'title' => 'Add Position',
     'description' => 'Create a new Open AdStream position',
@@ -256,7 +256,7 @@ function openadstream_menu() {
     'type' => MENU_LOCAL_TASK,
     'weight' => 2,
   );
-  
+
   $items['admin/build/openadstream/positions-delete'] = array(
     'title' => 'Delete Position',
     'description' => 'Delete a Open AdStream position',
@@ -267,7 +267,7 @@ function openadstream_menu() {
     'file' => 'openadstream.admin.inc',
     'type' => MENU_CALLBACK,
   );
-  
+
   $items['admin/build/openadstream/pagenames'] = array(
     'title' => 'Pagenames',
     'page callback' => 'openadstream_admin_pagenames',
@@ -276,7 +276,7 @@ function openadstream_menu() {
     'type' => MENU_LOCAL_TASK,
     'weight' => 5,
   );
-  
+
   $items['admin/build/openadstream/pagenames-add'] = array(
     'title' => 'Add Pagename',
     'page callback' => 'drupal_get_form',
@@ -286,7 +286,7 @@ function openadstream_menu() {
     'type' => MENU_LOCAL_TASK,
     'weight' => 6,
   );
-  
+
   $items['admin/build/openadstream/pagenames-edit'] = array(
     'title' => 'Edit Pagename',
     'page callback' => 'drupal_get_form',
@@ -295,7 +295,7 @@ function openadstream_menu() {
     'file' => 'openadstream.admin.inc',
     'type' => MENU_CALLBACK,
   );
-  
+
   $items['admin/build/openadstream/pagenames-delete'] = array(
     'title' => 'Delete Pagename',
     'page callback' => 'drupal_get_form',
@@ -304,7 +304,7 @@ function openadstream_menu() {
     'file' => 'openadstream.admin.inc',
     'type' => MENU_CALLBACK,
   );
-  
+
   return $items;
 }
 
@@ -359,12 +359,12 @@ function openadstream_ctools_plugin_directory($module, $plugin) {
 function openadstream_form_alter(&$form, $form_state, $form_id) {
   if (isset($form['type']) && isset($form['#node'])) {
     if ($form['type']['#value'] . '_node_form' == $form_id) {
-            
+
       // Only show the pagename node settings if the user has permission.
       if (user_access('administer openadstream configuration') || user_access('configure openadstream node pagenames')) {
-        
+
         if (isset($form['#node']->nid)) {
-          
+
           $pagename = _openadstream_node_pagename($form['#node']->nid);
           if ($pagename !== FALSE) {
             $default_value = $pagename;
@@ -468,7 +468,7 @@ function _openadstream_admin_positions() {
 /**
  * Retrieve a list of all positions
  *
- * @return 
+ * @return
  *   list of all positions
  */
 function _openadstream_positions() {
@@ -476,12 +476,12 @@ function _openadstream_positions() {
   if ($cache) {
     return $cache->data;
   }
-  
+
   $positions = _openadstream_admin_positions();
   $default_positions = _openadstream_invoke_default_positions();
   $positions = array_merge($positions, $default_positions);
   cache_set('openadstream_positions', $positions);
-  
+
   return $positions;
 }
 
@@ -531,13 +531,13 @@ function _openadstream_js($hostname, $pagename, $ad_positions, $tags='') {
   if (substr($pagename, -1, 1) == '/') {
     $substr($pagename, 0, -1);
   }
-  
+
   // Build the full URL to load the page JS.
   $src = $base_url . $hostname . "/' + p + '/" . rand() .'@'. implode(',', $ad_positions) . '?' . $tags;
-  $js = "<!--//--><![CDATA[//><!--\n";
-  // The pagename found thus far.
-  $js .= "var p='{$pagename}';\n";
   
+  // The pagename found thus far.
+  $js = "var p='{$pagename}';\n";
+
   // Optional code for checking the URL string.
   if ($qs = variable_get('openadstream_querystring', '')) {
     // JS function to grab URL variables.
@@ -563,9 +563,6 @@ function _openadstream_js($hostname, $pagename, $ad_positions, $tags='') {
   // Output the JS load code.
   $js .= "document.write('<' + 'script type=\"text/javascript\" src=\"{$src}\"><' + '/script>');\n";
 
-  // Close the JS.
-  $js .= "//--><!]]>\n";
-
   return $js;
 }
 
@@ -576,10 +573,8 @@ function _openadstream_block_js($position) {
   openadstream_positions($position);
   $position_lower = strtolower($position);
   $js = <<<JS
-    <div class="oas-ad oas-{$position_lower}"><script type="text/javascript">
-    <!--//--><![CDATA[//><!--
-    OAS_RICH('{$position}');
-    //--><!]]>
+    <div class="oas-ad oas-{$position_lower}"><script>
+      OAS_RICH('{$position}');
     </script></div>
 JS;
   return $js;
@@ -604,7 +599,7 @@ function _openadstream_admin_pagenames() {
   while ($pagename = $results->fetchAssoc()) {
     $pagenames[] = $pagename;
   }
-  
+
   return $pagenames;
 }
 
@@ -616,7 +611,7 @@ function _openadstream_admin_pagenames() {
  */
 function _openadstream_invoke_default_pagenames() {
   $return = array();
-  
+
   // Loop over each of the module implementations.
   foreach (module_implements('openadstream_default_pagenames') as $name) {
     // Call the module.
@@ -631,7 +626,7 @@ function _openadstream_invoke_default_pagenames() {
       $return = array_merge($return, $result);
     }
   }
-  
+
   // Sort pagenames by weight.
   usort($return, '_openadstream_cmp_pagenames');
 
@@ -644,7 +639,7 @@ function _openadstream_invoke_default_pagenames() {
 function _openadstream_cmp_pagenames($a, $b) {
   $a_weight = $a['weight'];
   $b_weight = $b['weight'];
-  
+
   if ($a_weight == $b_weight) {
     return 0;
   }
@@ -657,10 +652,10 @@ function _openadstream_cmp_pagenames($a, $b) {
  *
  * @return
  *   List of positions.
- */ 
+ */
 function _openadstream_invoke_default_positions() {
   $return = array();
-  
+
   // Loop over each of the module implementations.
   foreach (module_implements('openadstream_default_positions') as $name) {
     // Call the module.
@@ -680,7 +675,7 @@ function _openadstream_invoke_default_positions() {
       $return = array_merge($return, $result);
     }
   }
-  
+
   return $return;
 }
 
@@ -695,14 +690,14 @@ function _openadstream_pagenames() {
   if ($cache) {
     return $cache->data;
   }
-  
+
   $admin_pagenames = _openadstream_admin_pagenames();
   $module_pagenames = _openadstream_invoke_default_pagenames();
-  
+
   // Admin pagenames are first so they will win over module pagenames
   $pagenames = array_merge($admin_pagenames, $module_pagenames);
   cache_set('openadstream_pagenames', $pagenames);
-  
+
   return $pagenames;
 }
 
@@ -802,7 +797,7 @@ function _openadstream_gutters() {
 
   // If a gutter is needed, deal with it.
   if ($left || $right) {
-  
+
     // The time right now, used for calculations later.
     $now = REQUEST_TIME;
     // Paths that should be included.
@@ -831,7 +826,7 @@ function _openadstream_gutters() {
       $output = _openadstream_gutters_output($bgcolor);
     }
   }
-  
+
   return $output;
 }
 
@@ -843,8 +838,8 @@ function _openadstream_gutters_match($gutters) {
   foreach ($gutters as $gutter) {
     // If the From Date is empty or in the past, and if the To Date is empty
     // or in the future, and if the path matches, it's a match.
-    if ((empty($gutter['date_from']) || $gutter['date_from'] <= $now) 
-      && (empty($gutter['date_to']) || $gutter['date_to'] >= $now) 
+    if ((empty($gutter['date_from']) || $gutter['date_from'] <= $now)
+      && (empty($gutter['date_to']) || $gutter['date_to'] >= $now)
       && _openadstream_match_path($gutter['path'])) {
       // If there's a bgcolor, send that back
       if (!empty($gutter['bgcolor'])) {
@@ -867,7 +862,7 @@ function _openadstream_gutters_output($bgcolor = '') {
   $dom = variable_get('openadstream_gutter_dom', '#page');
   // Optional padding to put between the gutter and the page content.
   $padding = (int) variable_get('openadstream_gutter_padding', 0);
-  
+
   // The JS block gets appended to the other output at the end.
   $output = '';
   $js = '';
@@ -914,7 +909,7 @@ function _openadstream_gutters_output($bgcolor = '') {
   $js .= "  jQuery(window).resize(gutter_resize);\n";
   // Resize the gutter immediately.
   $js .= "  gutter_resize();\n";
-  
+
   // Close off the initial DOM logic.
   $js .= "});\n";
 
@@ -922,7 +917,7 @@ function _openadstream_gutters_output($bgcolor = '') {
 
   // Add the compiled JS to the output.
   $output .= $js;
-  
+
   return $output;
 }
 
@@ -957,7 +952,7 @@ function _openadstream_list_gutters($type) {
   foreach ($gutters as $type => $data) {
     cache_set('openadstream_gutters_' . $type, $data);
   }
-  
+
   return $gutters[$type];
 }
 
