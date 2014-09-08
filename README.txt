@@ -1,3 +1,7 @@
+OLD VERSION!
+
+Please see the current version at https://www.drupal.org/project/openadstream
+
 $Id: README.txt,v 1.1.2.2 2009/12/30 05:11:11 damienmckenna Exp $
 
 Open AdStream Module Instructions
